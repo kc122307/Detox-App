@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Code to Unlock</string>
+    <string name="accessibility_service_description">Enforces digital wellbeing boundaries by detecting restricted social media applications and presenting gamified coding challenges to unlock earned screen time.</string>
+</resources>
