@@ -270,3 +270,4 @@ BEGIN
     RETURN jsonb_build_object('success', true, 'reward_id', v_reward.id, 'expires_at', v_reward.expires_at);
 END;
 $$;
+

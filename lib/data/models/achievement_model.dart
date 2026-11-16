@@ -73,3 +73,4 @@ class AchievementModel {
         maxProgress: (json['max_progress'] as num?)?.toInt() ?? 1,
       );
 }
+

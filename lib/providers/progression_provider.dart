@@ -65,3 +65,4 @@ class ProgressionProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
+

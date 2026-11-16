@@ -68,3 +68,4 @@ class DifficultyBadge extends StatelessWidget {
     );
   }
 }
+

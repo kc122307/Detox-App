@@ -12,6 +12,7 @@ class AppUsageRepository {
   static const _kDailyUsagePrefix = 'daily_usage_';
   static const _kRewardTransactionsKey = 'reward_transactions_list';
   static const _kUnlockSessionsKey = 'unlock_sessions_list';
+  static const _kLastActiveDateKey = 'last_active_date_key';
   static const _uuid = Uuid();
 
   final SharedPreferences _prefs;
@@ -76,10 +77,15 @@ class AppUsageRepository {
     }
   }
 
-  // --- Usage Tracking ---
+  // --- Usage Tracking & Rollover ---
 
   int getTodayUsageSeconds(String packageName) {
     final dateKey = TimeUtils.getTodayDateKey();
+    final key = '$_kDailyUsagePrefix${dateKey}_$packageName';
+    return _prefs.getInt(key) ?? 0;
+  }
+
+  int getUsageForDate(String packageName, String dateKey) {
     final key = '$_kDailyUsagePrefix${dateKey}_$packageName';
     return _prefs.getInt(key) ?? 0;
   }
@@ -95,6 +101,14 @@ class AppUsageRepository {
     final dateKey = TimeUtils.getTodayDateKey();
     final key = '$_kDailyUsagePrefix${dateKey}_$packageName';
     await _prefs.setInt(key, seconds);
+  }
+
+  String getLastKnownDateKey() {
+    return _prefs.getString(_kLastActiveDateKey) ?? TimeUtils.getTodayDateKey();
+  }
+
+  Future<void> recordDateActive(String dateKey) async {
+    await _prefs.setString(_kLastActiveDateKey, dateKey);
   }
 
   // --- Reward Transactions ---
@@ -174,11 +188,12 @@ class AppUsageRepository {
     }
 
     // Determine sequence number today
+    final todayKey = TimeUtils.getTodayDateKey();
     final completedToday = sessions.where((s) =>
         s.packageName == packageName &&
         s.status == 'completed' &&
         s.completedAt != null &&
-        TimeUtils.getTodayDateKey() == TimeUtils.formatShortDate(s.completedAt!)).length;
+        todayKey == TimeUtils.formatShortDate(s.completedAt!)).length;
 
     final nextSequence = completedToday + 1;
     final requiredQuestions = nextSequence == 1
@@ -248,5 +263,23 @@ class AppUsageRepository {
     }
 
     return true; // Restricted!
+  }
+
+  // --- Data Export & Privacy Controls ---
+
+  Map<String, dynamic> exportAllData() {
+    return {
+      'managed_apps': getManagedApps().map((a) => a.toJson()).toList(),
+      'reward_transactions': getRewardTransactions().map((r) => r.toJson()).toList(),
+      'unlock_sessions': getUnlockSessions().map((s) => s.toJson()).toList(),
+      'export_timestamp': DateTime.now().toIso8601String(),
+    };
+  }
+
+  Future<void> clearAllData() async {
+    await _prefs.remove(_kManagedAppsKey);
+    await _prefs.remove(_kRewardTransactionsKey);
+    await _prefs.remove(_kUnlockSessionsKey);
+    await _prefs.remove(_kLastActiveDateKey);
   }
 }

@@ -212,3 +212,4 @@ class AchievementsScreen extends StatelessWidget {
     );
   }
 }
+

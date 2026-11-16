@@ -6,8 +6,9 @@ import android.content.Intent
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
-        if (intent?.action == Intent.ACTION_BOOT_COMPLETED) {
-            // Restore device monitoring and restrictions upon reboot
+        if (intent?.action == Intent.ACTION_BOOT_COMPLETED && context != null) {
+            // Restore persistent restrictions immediately upon device boot
+            AppRestrictionAccessibilityService.loadRestrictions(context)
         }
     }
 }

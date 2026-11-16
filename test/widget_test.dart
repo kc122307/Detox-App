@@ -1,8 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:code_to_unlock/core/constants/app_constants.dart';
+import 'package:code_to_unlock/core/services/notification_service.dart';
 import 'package:code_to_unlock/data/execution/code_execution_engine.dart';
 import 'package:code_to_unlock/data/models/user_progress_model.dart';
+import 'package:code_to_unlock/data/questions/curated_problem_bank.dart';
 import 'package:code_to_unlock/data/questions/procedural_problem_generator.dart';
+import 'package:code_to_unlock/data/repositories/app_usage_repository.dart';
 import 'package:code_to_unlock/data/repositories/question_repository.dart';
 
 void main() {
@@ -55,6 +59,20 @@ void main() {
 
       final lvl900 = ProceduralProblemGenerator.generateForLevel(900);
       expect(lvl900.difficultyBand, 'Master');
+    });
+
+    test('Curated Problem Bank: Validates comprehensive interview catalog', () {
+      final problems = CuratedProblemBank.getCuratedProblems();
+      expect(problems.length, greaterThanOrEqualTo(10));
+
+      for (final p in problems) {
+        expect(p.canonicalProblemId, startsWith('canonical_'));
+        expect(p.title, isNotEmpty);
+        expect(p.description, isNotEmpty);
+        expect(p.sampleTestCases, isNotEmpty);
+        expect(p.hiddenTestCases, isNotEmpty);
+        expect(p.starterCode.keys, containsAll(['Python', 'JavaScript', 'Java', 'C++']));
+      }
     });
 
     test('Question Repository: Strict uniqueness guarantees no repetition', () {
@@ -127,6 +145,33 @@ void main() {
       expect(progress.currentDifficultyBand, 'Beginner');
       expect(progress.xpForNextLevel, 100);
       expect(progress.levelProgress, 0.45);
+    });
+
+    test('Notification Service: Dispatches and rings notifications', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final service = NotificationService(prefs);
+
+      expect(service.isEnabled, isTrue);
+      expect(service.recentNotifications, isEmpty);
+
+      service.notifyLimitExhausted('Instagram');
+      expect(service.recentNotifications.length, 1);
+      expect(service.recentNotifications.first.title, contains('Instagram Limit Reached'));
+
+      service.notifyRewardUnlocked('Instagram');
+      expect(service.recentNotifications.length, 2);
+      expect(service.recentNotifications.first.title, contains('20 Minutes Unlocked'));
+    });
+
+    test('App Usage Repository: Exports data and records rollover cleanly', () async {
+      SharedPreferences.setMockInitialValues({});
+      final repo = await AppUsageRepository.create();
+
+      final export = repo.exportAllData();
+      expect(export.containsKey('managed_apps'), isTrue);
+      expect(export.containsKey('reward_transactions'), isTrue);
+      expect(export.containsKey('unlock_sessions'), isTrue);
     });
   });
 }

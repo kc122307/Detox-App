@@ -21,3 +21,4 @@ class TestCaseValidator {
     return s.trim().replaceAll('\r\n', '\n').replaceAll('"', '\'');
   }
 }
+

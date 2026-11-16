@@ -112,3 +112,4 @@ class UserPreferencesRepository {
     await _prefs.setString(_kEmergencyLogs, jsonEncode(logs.map((e) => e.toJson()).toList()));
   }
 }
+

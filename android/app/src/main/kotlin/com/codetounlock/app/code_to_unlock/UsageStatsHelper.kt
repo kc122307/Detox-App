@@ -45,3 +45,4 @@ class UsageStatsHelper(private val context: Context) {
         return 0L
     }
 }
+

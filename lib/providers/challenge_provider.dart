@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/services/notification_service.dart';
 import '../data/execution/code_execution_engine.dart';
 import '../data/models/question_model.dart';
 import '../data/models/reward_transaction_model.dart';
@@ -12,6 +13,7 @@ class ChallengeProvider extends ChangeNotifier {
   final QuestionRepository _questionRepo;
   final ProgressionProvider _progressionProvider;
   final UsageTrackingProvider _usageProvider;
+  final NotificationService? notificationService;
 
   QuestionModel? _currentQuestion;
   String _selectedLanguage = AppConstants.defaultLanguage;
@@ -31,8 +33,9 @@ class ChallengeProvider extends ChangeNotifier {
   ChallengeProvider(
     this._questionRepo,
     this._progressionProvider,
-    this._usageProvider,
-  );
+    this._usageProvider, {
+    this.notificationService,
+  });
 
   QuestionModel? get currentQuestion => _currentQuestion;
   String get selectedLanguage => _selectedLanguage;
@@ -189,6 +192,8 @@ class ChallengeProvider extends ChangeNotifier {
     _lastResult = result;
 
     if (result.isAccepted) {
+      notificationService?.notifyGoalCompleted(_progressionProvider.progress.totalSolved + 1);
+
       // 1. Advance user progression & XP
       await _progressionProvider.onProblemSolved(_currentQuestion!);
 

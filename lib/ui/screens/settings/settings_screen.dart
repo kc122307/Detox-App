@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/time_utils.dart';
 import '../../../data/platform/app_usage_bridge.dart';
+import '../../../data/repositories/app_usage_repository.dart';
 import '../../../data/repositories/user_preferences_repository.dart';
 import '../../../providers/progression_provider.dart';
 import '../../widgets/glassmorphic_card.dart';
@@ -212,8 +214,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 children: [
                   ListTile(
-                    title: const Text('Product Philosophy'),
-                    subtitle: const Text(AppConstants.appPhilosophy),
+                    title: const Text('Export My Data (JSON)'),
+                    subtitle: const Text('Export all progress, usage records, and audit logs.'),
+                    trailing: const Icon(Icons.download, color: AppColors.secondary),
+                    onTap: () => _exportUserData(context),
+                  ),
+                  const Divider(color: AppColors.surfaceBorder, height: 1),
+                  ListTile(
+                    title: const Text('Reset All Data'),
+                    subtitle: const Text('Permanently wipe local statistics and reset all limits.'),
+                    trailing: const Icon(Icons.delete_forever, color: AppColors.error),
+                    onTap: () => _confirmResetData(context),
                   ),
                   const Divider(color: AppColors.surfaceBorder, height: 1),
                   ListTile(
@@ -286,4 +297,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     );
   }
+
+  void _exportUserData(BuildContext context) {
+    final appRepo = context.read<AppUsageRepository>();
+    final progress = context.read<ProgressionProvider>().progress;
+    final exportMap = {
+      'user_progress': progress.toJson(),
+      'usage_data': appRepo.exportAllData(),
+      'export_date': DateTime.now().toIso8601String(),
+    };
+    final jsonOutput = const JsonEncoder.withIndent('  ').convert(exportMap);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Exported User Data'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              jsonOutput,
+              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmResetData(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Reset All Data?'),
+        content: const Text(
+          'This will permanently delete all your usage statistics, streak history, and reward logs. This action cannot be undone.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () async {
+              final appRepo = context.read<AppUsageRepository>();
+              await appRepo.clearAllData();
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('All data has been wiped successfully.'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            },
+            child: const Text('Permanently Reset'),
+          ),
+        ],
+      ),
+    );
+  }
 }
+

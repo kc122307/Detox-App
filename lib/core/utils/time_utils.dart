@@ -53,3 +53,4 @@ class TimeUtils {
     return DateFormat('EEE, MMM d').format(dateTime);
   }
 }
+

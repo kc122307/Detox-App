@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/services/notification_service.dart';
+import '../../core/utils/time_utils.dart';
 import '../data/models/managed_app_model.dart';
 import '../data/models/reward_transaction_model.dart';
 import '../data/models/unlock_session_model.dart';
@@ -9,6 +11,7 @@ import '../data/platform/app_usage_bridge.dart';
 
 class UsageTrackingProvider extends ChangeNotifier {
   final AppUsageRepository _repository;
+  final NotificationService? notificationService;
   Timer? _tickerTimer;
 
   List<ManagedAppModel> _managedApps = [];
@@ -17,8 +20,9 @@ class UsageTrackingProvider extends ChangeNotifier {
   Map<String, bool> _restrictedStatus = {};
 
   String? _currentlyRestrictedAppPackage;
+  String _currentDateKey = TimeUtils.getTodayDateKey();
 
-  UsageTrackingProvider(this._repository) {
+  UsageTrackingProvider(this._repository, {this.notificationService}) {
     _loadState();
     _startUsageTicker();
   }
@@ -90,6 +94,15 @@ class UsageTrackingProvider extends ChangeNotifier {
   void _startUsageTicker() {
     _tickerTimer?.cancel();
     _tickerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Check for midnight rollover
+      final nowKey = TimeUtils.getTodayDateKey();
+      if (nowKey != _currentDateKey) {
+        _currentDateKey = nowKey;
+        _repository.recordDateActive(nowKey);
+        _refreshUsageData();
+        return;
+      }
+
       // Check countdowns for active rewards
       bool shouldNotify = false;
       for (final app in _managedApps) {
@@ -147,6 +160,11 @@ class UsageTrackingProvider extends ChangeNotifier {
     // If limit exceeded and no active reward, set as restricted
     if (_repository.isAppRestricted(packageName)) {
       _currentlyRestrictedAppPackage = packageName;
+      final app = _managedApps.firstWhere(
+        (a) => a.packageName == packageName,
+        orElse: () => ManagedAppModel(id: '', userId: '', packageName: packageName, appName: 'App', dailyLimitSeconds: 0),
+      );
+      notificationService?.notifyLimitExhausted(app.appName);
       notifyListeners();
     }
   }
@@ -185,6 +203,11 @@ class UsageTrackingProvider extends ChangeNotifier {
     );
 
     _currentlyRestrictedAppPackage = null;
+    final app = _managedApps.firstWhere(
+      (a) => a.packageName == packageName,
+      orElse: () => ManagedAppModel(id: '', userId: '', packageName: packageName, appName: 'App', dailyLimitSeconds: 0),
+    );
+    notificationService?.notifyRewardUnlocked(app.appName);
     _refreshUsageData();
     return reward;
   }

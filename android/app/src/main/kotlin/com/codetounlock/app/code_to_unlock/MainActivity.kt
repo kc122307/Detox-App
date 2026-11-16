@@ -16,6 +16,9 @@ class MainActivity : FlutterActivity() {
 
         val usageHelper = UsageStatsHelper(this)
 
+        // Load existing persistent restrictions
+        AppRestrictionAccessibilityService.loadRestrictions(this)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "hasUsagePermission" -> {
@@ -55,14 +58,19 @@ class MainActivity : FlutterActivity() {
                     val restrictedList = call.argument<List<String>>("restrictedPackages") ?: emptyList()
                     val activeRewardsMap = call.argument<Map<String, Int>>("activeRewards") ?: emptyMap()
 
-                    AppRestrictionAccessibilityService.restrictedPackages = restrictedList.toSet()
-
                     val now = System.currentTimeMillis()
                     val epochRewards = HashMap<String, Long>()
                     for ((pkg, secsLeft) in activeRewardsMap) {
                         epochRewards[pkg] = now + (secsLeft * 1000L)
                     }
-                    AppRestrictionAccessibilityService.activeRewards = epochRewards
+
+                    // Save to persistent SharedPreferences and in-memory static state
+                    AppRestrictionAccessibilityService.saveRestrictions(
+                        this,
+                        restrictedList.toSet(),
+                        epochRewards
+                    )
+
                     result.success(true)
                 }
                 else -> {

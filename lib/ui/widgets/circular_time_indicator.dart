@@ -103,3 +103,4 @@ class CircularTimeIndicator extends StatelessWidget {
     );
   }
 }
+

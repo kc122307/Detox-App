@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'data/repositories/app_usage_repository.dart';
 import 'data/repositories/progression_repository.dart';
@@ -16,6 +17,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
 
+  final notificationService = NotificationService(prefs);
   final userPreferencesRepo = UserPreferencesRepository(prefs);
   final appUsageRepo = AppUsageRepository(prefs);
   final progressionRepo = ProgressionRepository(prefs);
@@ -24,12 +26,13 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider<NotificationService>.value(value: notificationService),
         Provider<UserPreferencesRepository>.value(value: userPreferencesRepo),
         Provider<AppUsageRepository>.value(value: appUsageRepo),
         Provider<ProgressionRepository>.value(value: progressionRepo),
         Provider<QuestionRepository>.value(value: questionRepo),
         ChangeNotifierProvider<UsageTrackingProvider>(
-          create: (_) => UsageTrackingProvider(appUsageRepo),
+          create: (_) => UsageTrackingProvider(appUsageRepo, notificationService: notificationService),
         ),
         ChangeNotifierProvider<ProgressionProvider>(
           create: (_) => ProgressionProvider(progressionRepo),
@@ -39,9 +42,10 @@ void main() async {
             questionRepo,
             ctx.read<ProgressionProvider>(),
             ctx.read<UsageTrackingProvider>(),
+            notificationService: notificationService,
           ),
           update: (ctx, progression, usage, previous) =>
-              previous ?? ChallengeProvider(questionRepo, progression, usage),
+              previous ?? ChallengeProvider(questionRepo, progression, usage, notificationService: notificationService),
         ),
       ],
       child: const CodeToUnlockApp(),
