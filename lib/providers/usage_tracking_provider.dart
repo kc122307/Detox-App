@@ -21,9 +21,11 @@ class UsageTrackingProvider extends ChangeNotifier {
 
   String? _currentlyRestrictedAppPackage;
   String _currentDateKey = TimeUtils.getTodayDateKey();
+  bool _isSyncingApps = false;
 
   UsageTrackingProvider(this._repository, {this.notificationService}) {
     _loadState();
+    syncInstalledApplications();
     _startUsageTicker();
   }
 
@@ -32,6 +34,22 @@ class UsageTrackingProvider extends ChangeNotifier {
   Map<String, RewardTransactionModel?> get activeRewards => _activeRewards;
   Map<String, bool> get restrictedStatus => _restrictedStatus;
   String? get currentlyRestrictedAppPackage => _currentlyRestrictedAppPackage;
+  bool get isSyncingApps => _isSyncingApps;
+
+  /// Scans all launchable applications installed on the phone and merges them into detox manager
+  Future<void> syncInstalledApplications() async {
+    _isSyncingApps = true;
+    notifyListeners();
+    try {
+      final installed = await AppUsageBridge.getInstalledApplications();
+      if (installed.isNotEmpty) {
+        _managedApps = await _repository.syncWithInstalledApps(installed);
+        _refreshUsageData();
+      }
+    } catch (_) {}
+    _isSyncingApps = false;
+    notifyListeners();
+  }
 
   int get totalAllowedSeconds => _managedApps
       .where((a) => a.protectionEnabled)

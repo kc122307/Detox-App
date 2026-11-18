@@ -79,7 +79,7 @@ class AppUsageBridge {
         packageName: target['packageName'] as String,
         appName: target['appName'] as String,
         dailyLimitSeconds: (target['defaultLimitMinutes'] as int) * 60,
-        protectionEnabled: true,
+        protectionEnabled: false,
         category: target['category'] as String,
         iconIdentifier: target['iconIdentifier'] as String,
       );

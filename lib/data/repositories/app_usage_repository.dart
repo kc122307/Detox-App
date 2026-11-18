@@ -29,7 +29,7 @@ class AppUsageRepository {
   List<ManagedAppModel> getManagedApps() {
     final jsonStr = _prefs.getString(_kManagedAppsKey);
     if (jsonStr == null) {
-      // Initialize with default target apps
+      // Initialize with target apps, all disabled (OFF) by default
       final defaultApps = AppConstants.defaultTargetApps.map((target) {
         return ManagedAppModel(
           id: target['packageName'] as String,
@@ -37,7 +37,7 @@ class AppUsageRepository {
           packageName: target['packageName'] as String,
           appName: target['appName'] as String,
           dailyLimitSeconds: (target['defaultLimitMinutes'] as int) * 60,
-          protectionEnabled: true,
+          protectionEnabled: false, // Default is OFF: user can use freely unless switched on
           category: target['category'] as String,
           iconIdentifier: target['iconIdentifier'] as String,
         );
@@ -52,6 +52,37 @@ class AppUsageRepository {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Merges all real installed applications on the phone with user's saved preferences
+  Future<List<ManagedAppModel>> syncWithInstalledApps(List<ManagedAppModel> installedApps) async {
+    final existingApps = getManagedApps();
+    final Map<String, ManagedAppModel> existingMap = {
+      for (final a in existingApps) a.packageName: a,
+    };
+
+    final List<ManagedAppModel> merged = [];
+    for (final installed in installedApps) {
+      if (existingMap.containsKey(installed.packageName)) {
+        final current = existingMap[installed.packageName]!;
+        merged.add(installed.copyWith(
+          dailyLimitSeconds: current.dailyLimitSeconds,
+          protectionEnabled: current.protectionEnabled,
+        ));
+      } else {
+        // Newly discovered app on the mobile: OFF by default (free to use freely)
+        merged.add(installed.copyWith(
+          protectionEnabled: false,
+          dailyLimitSeconds: 3600, // 1 hour baseline if switched on
+        ));
+      }
+    }
+
+    if (merged.isNotEmpty) {
+      await saveManagedApps(merged);
+      return merged;
+    }
+    return existingApps;
   }
 
   Future<void> saveManagedApps(List<ManagedAppModel> apps) async {

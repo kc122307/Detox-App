@@ -38,20 +38,33 @@ class MainActivity : FlutterActivity() {
                 "getInstalledApps" -> {
                     val appsList = ArrayList<Map<String, Any>>()
                     val pm = packageManager
-                    val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                    for (pkg in packages) {
-                        // Filter to launchable apps only
-                        if (pm.getLaunchIntentForPackage(pkg.packageName) != null) {
-                            val appName = pm.getApplicationLabel(pkg).toString()
-                            val isSystem = (pkg.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                            val appMap = HashMap<String, Any>()
-                            appMap["packageName"] = pkg.packageName
-                            appMap["appName"] = appName
-                            appMap["isSystem"] = isSystem
-                            appMap["category"] = if (isSystem) "System" else "User Installed"
-                            appsList.add(appMap)
-                        }
+                    val launcherIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                        addCategory(Intent.CATEGORY_LAUNCHER)
                     }
+                    val resolveInfos = pm.queryIntentActivities(launcherIntent, 0)
+                    val seenPackages = HashSet<String>()
+
+                    for (info in resolveInfos) {
+                        val pkgName = info.activityInfo.packageName
+                        // Exclude Code to Unlock self
+                        if (pkgName == packageName || seenPackages.contains(pkgName)) {
+                            continue
+                        }
+                        seenPackages.add(pkgName)
+
+                        val appName = info.loadLabel(pm)?.toString() ?: pkgName
+                        val isSystem = (info.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+
+                        val appMap = HashMap<String, Any>()
+                        appMap["packageName"] = pkgName
+                        appMap["appName"] = appName
+                        appMap["isSystem"] = isSystem
+                        appMap["category"] = if (isSystem) "System" else "Installed"
+                        appsList.add(appMap)
+                    }
+
+                    // Sort alphabetically by app name
+                    appsList.sortBy { (it["appName"] as? String)?.lowercase() ?: "" }
                     result.success(appsList)
                 }
                 "updateActiveRestrictions" -> {

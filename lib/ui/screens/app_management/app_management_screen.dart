@@ -17,20 +17,41 @@ class AppManagementScreen extends StatefulWidget {
 class _AppManagementScreenState extends State<AppManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _showOnlyProtected = false;
 
   @override
   Widget build(BuildContext context) {
     final usageProvider = context.watch<UsageTrackingProvider>();
-    final apps = usageProvider.managedApps.where((app) {
+    final allApps = usageProvider.managedApps;
+    final protectedCount = allApps.where((a) => a.protectionEnabled).length;
+
+    final apps = allApps.where((app) {
+      if (_showOnlyProtected && !app.protectionEnabled) return false;
       if (_searchQuery.isEmpty) return true;
       return app.appName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          app.packageName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           app.category.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('App Limits & Protection'),
+        title: const Text('App Limits & Detox'),
+        actions: [
+          IconButton(
+            icon: usageProvider.isSyncingApps
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                  )
+                : const Icon(Icons.sync),
+            tooltip: 'Rescan Installed Apps',
+            onPressed: usageProvider.isSyncingApps
+                ? null
+                : () => usageProvider.syncInstalledApplications(),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -41,7 +62,7 @@ class _AppManagementScreenState extends State<AppManagementScreen> {
               controller: _searchController,
               onChanged: (val) => setState(() => _searchQuery = val),
               decoration: InputDecoration(
-                hintText: 'Search applications or categories...',
+                hintText: 'Search any installed app on your mobile...',
                 prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -56,6 +77,23 @@ class _AppManagementScreenState extends State<AppManagementScreen> {
             ),
           ),
 
+          // Filter chips Row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                _buildFilterChip('All Installed (${allApps.length})', !_showOnlyProtected, () {
+                  setState(() => _showOnlyProtected = false);
+                }),
+                const SizedBox(width: 8),
+                _buildFilterChip('Detox Switched ON ($protectedCount)', _showOnlyProtected, () {
+                  setState(() => _showOnlyProtected = true);
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+
           // Info banner
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -63,11 +101,11 @@ class _AppManagementScreenState extends State<AppManagementScreen> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 20, color: AppColors.secondary),
+                  const Icon(Icons.shield_outlined, size: 20, color: AppColors.secondary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Solving a coding challenge unlocks 20 additional minutes without resetting your daily baseline allowance.',
+                      'Apps with switch OFF are completely free to use. Switch ON detox only for apps you wish to restrict.',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary.withAlpha(220),
@@ -223,6 +261,31 @@ class _AppManagementScreenState extends State<AppManagementScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withAlpha(40) : AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.surfaceBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? AppColors.primaryLight : AppColors.textSecondary,
+          ),
+        ),
+      ),
     );
   }
 }

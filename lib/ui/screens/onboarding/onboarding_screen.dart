@@ -25,29 +25,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Form states
   String _selectedLanguage = 'Python';
   final Map<String, int> _appLimits = {};
+  // All apps are OFF / unrestricted by default!
+  // User must explicitly switch ON only the apps they want to restrict.
   final Set<String> _enabledAppPackages = {};
+  String _appSearchQuery = '';
+  bool _showOnlyEnabledApps = false;
 
   @override
   void initState() {
     super.initState();
-    // Default sensible per-app limits for target applications
+    // Default baseline limits when an app is switched ON
     _appLimits['com.google.android.youtube'] = 60; // 1 hour
-    _appLimits['com.instagram.android'] = 45; // 45 minutes
+    _appLimits['com.instagram.android'] = 60; // 1 hour
     _appLimits['com.reddit.frontpage'] = 30; // 30 minutes
     _appLimits['com.facebook.katana'] = 30;
     _appLimits['com.snapchat.android'] = 30;
     _appLimits['com.twitter.android'] = 30;
     _appLimits['com.whatsapp'] = 120; // 2 hours
-
-    // By default, social media apps have detox enabled; others can be toggled
-    _enabledAppPackages.addAll([
-      'com.google.android.youtube',
-      'com.instagram.android',
-      'com.reddit.frontpage',
-      'com.facebook.katana',
-      'com.snapchat.android',
-      'com.twitter.android',
-    ]);
   }
 
   void _nextPage() {
@@ -474,7 +468,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // --- Screen 4: Individual App Limits (Star Screen) ---
   Widget _buildAppConfigPage() {
-    final apps = context.watch<UsageTrackingProvider>().managedApps;
+    final usageProvider = context.watch<UsageTrackingProvider>();
+    final allApps = usageProvider.managedApps;
+
+    final filteredApps = allApps.where((app) {
+      if (_showOnlyEnabledApps && !_enabledAppPackages.contains(app.packageName)) {
+        return false;
+      }
+      if (_appSearchQuery.isEmpty) return true;
+      return app.appName.toLowerCase().contains(_appSearchQuery.toLowerCase()) ||
+          app.packageName.toLowerCase().contains(_appSearchQuery.toLowerCase()) ||
+          app.category.toLowerCase().contains(_appSearchQuery.toLowerCase());
+    }).toList();
 
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -489,147 +494,221 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           const Text(
-            'Detox is 100% individual. Set different limits for different apps (e.g. 1 hour, 2 hours), or turn detox OFF for apps you do not want restricted.',
+            'All apps on your phone are unrestricted by default. Switch ON detox only for the apps you want to limit, and set their allowed time (e.g. 1 hour, 2 hours).',
             style: TextStyle(fontSize: 13, color: AppColors.textMuted),
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView.builder(
-              itemCount: apps.length,
-              itemBuilder: (context, index) {
-                final app = apps[index];
-                final isEnabled = _enabledAppPackages.contains(app.packageName);
-                final currentLimit = _appLimits[app.packageName] ?? app.dailyLimitMinutes;
+          const SizedBox(height: 14),
 
-                return GlassmorphicCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(14),
-                  border: isEnabled
-                      ? Border.all(color: AppColors.primary.withAlpha(120), width: 1.2)
-                      : null,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header Row: App Name + Switch
-                      Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: isEnabled
-                                  ? AppColors.primary.withAlpha(40)
-                                  : AppColors.surfaceElevated,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.apps,
-                              color: isEnabled ? AppColors.primaryLight : AppColors.textMuted,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+          // Search Box
+          TextField(
+            onChanged: (val) => setState(() => _appSearchQuery = val),
+            style: const TextStyle(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Search installed applications...',
+              prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.textMuted),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              filled: true,
+              fillColor: AppColors.surfaceElevated,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.surfaceBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.surfaceBorder),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Filter Row: All Apps vs Switched ON
+          Row(
+            children: [
+              _buildFilterBadge('All Apps (${allApps.length})', !_showOnlyEnabledApps, () {
+                setState(() => _showOnlyEnabledApps = false);
+              }),
+              const SizedBox(width: 8),
+              _buildFilterBadge('Switched ON (${_enabledAppPackages.length})', _showOnlyEnabledApps, () {
+                setState(() => _showOnlyEnabledApps = true);
+              }),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          Expanded(
+            child: filteredApps.isEmpty
+                ? Center(
+                    child: Text(
+                      _showOnlyEnabledApps
+                          ? 'No apps switched ON yet.\nToggle the switch for apps you want to limit.'
+                          : 'No matching installed applications found.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.textMuted),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: filteredApps.length,
+                    itemBuilder: (context, index) {
+                      final app = filteredApps[index];
+                      final isEnabled = _enabledAppPackages.contains(app.packageName);
+                      final currentLimit = _appLimits[app.packageName] ?? app.dailyLimitMinutes;
+
+                      return GlassmorphicCard(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(12),
+                        border: isEnabled
+                            ? Border.all(color: AppColors.primary.withAlpha(140), width: 1.5)
+                            : null,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header Row: App Name + Switch
+                            Row(
                               children: [
-                                Text(
-                                  app.appName,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
                                     color: isEnabled
-                                        ? AppColors.textPrimary
-                                        : AppColors.textSecondary,
+                                        ? AppColors.primary.withAlpha(40)
+                                        : AppColors.surfaceElevated,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.apps,
+                                    color: isEnabled ? AppColors.primaryLight : AppColors.textMuted,
+                                    size: 20,
                                   ),
                                 ),
-                                Text(
-                                  isEnabled
-                                      ? 'Daily limit: ${_formatLimitText(currentLimit)}'
-                                      : 'Detox OFF (Unrestricted)',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isEnabled
-                                        ? AppColors.secondary
-                                        : AppColors.textMuted,
-                                    fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        app.appName,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: isEnabled
+                                              ? AppColors.textPrimary
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        isEnabled
+                                            ? 'Daily limit: ${_formatLimitText(currentLimit)}'
+                                            : 'Free to use freely (Detox OFF)',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isEnabled
+                                              ? AppColors.secondary
+                                              : AppColors.textMuted,
+                                          fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                ),
+                                Switch(
+                                  value: isEnabled,
+                                  activeThumbColor: AppColors.primary,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val) {
+                                        _enabledAppPackages.add(app.packageName);
+                                      } else {
+                                        _enabledAppPackages.remove(app.packageName);
+                                      }
+                                    });
+                                  },
                                 ),
                               ],
                             ),
-                          ),
-                          Switch(
-                            value: isEnabled,
-                            activeThumbColor: AppColors.primary,
-                            onChanged: (val) {
-                              setState(() {
-                                if (val) {
-                                  _enabledAppPackages.add(app.packageName);
-                                } else {
-                                  _enabledAppPackages.remove(app.packageName);
-                                }
-                              });
-                            },
-                          ),
-                        ],
-                      ),
 
-                      // If Detox is ON: show quick preset chips for 30m, 1h, 2h, and custom
-                      if (isEnabled) ...[
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            _buildPresetChip(app.packageName, 30, '30m', currentLimit),
-                            const SizedBox(width: 6),
-                            _buildPresetChip(app.packageName, 60, '1 hour', currentLimit),
-                            const SizedBox(width: 6),
-                            _buildPresetChip(app.packageName, 120, '2 hours', currentLimit),
-                            const SizedBox(width: 6),
-                            InkWell(
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => AppLimitDialog(
-                                    appName: app.appName,
-                                    currentLimitMinutes: currentLimit,
-                                    onSave: (newMinutes) {
-                                      setState(() {
-                                        _appLimits[app.packageName] = newMinutes;
-                                      });
+                            // If Detox is ON: show quick preset chips for 30m, 1h, 2h, and custom
+                            if (isEnabled) ...[
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  _buildPresetChip(app.packageName, 30, '30m', currentLimit),
+                                  const SizedBox(width: 6),
+                                  _buildPresetChip(app.packageName, 60, '1 hour', currentLimit),
+                                  const SizedBox(width: 6),
+                                  _buildPresetChip(app.packageName, 120, '2 hours', currentLimit),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (ctx) => AppLimitDialog(
+                                          appName: app.appName,
+                                          currentLimitMinutes: currentLimit,
+                                          onSave: (newMinutes) {
+                                            setState(() {
+                                              _appLimits[app.packageName] = newMinutes;
+                                            });
+                                          },
+                                        ),
+                                      );
                                     },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfaceElevated,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: AppColors.surfaceBorder),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.edit, size: 12, color: AppColors.textSecondary),
+                                          SizedBox(width: 4),
+                                          Text('Custom', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceElevated,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppColors.surfaceBorder),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.edit, size: 12, color: AppColors.textSecondary),
-                                    SizedBox(width: 4),
-                                    Text('Custom', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                                  ],
-                                ),
+                                ],
                               ),
-                            ),
+                            ],
                           ],
                         ),
-                      ],
-                    ],
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFilterBadge(String label, bool isSelected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withAlpha(40) : AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.surfaceBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? AppColors.primaryLight : AppColors.textSecondary,
+          ),
+        ),
       ),
     );
   }
