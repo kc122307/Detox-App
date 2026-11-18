@@ -143,13 +143,19 @@ class _CodeEditorWidgetState extends State<CodeEditorWidget> {
                         buttonItems: items,
                       );
                     },
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
                       fillColor: Colors.transparent,
+                      hintText: '// Type your solution manually here...\n// (Copy-paste is disabled)',
+                      hintStyle: GoogleFonts.jetBrainsMono(
+                        color: AppColors.textMuted.withAlpha(120),
+                        fontSize: widget.fontSize,
+                        height: 1.5,
+                      ),
                     ),
                     onChanged: (text) {
                       setState(() {

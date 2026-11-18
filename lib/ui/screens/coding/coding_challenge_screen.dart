@@ -106,16 +106,33 @@ class _CodingChallengeScreenState extends State<CodingChallengeScreen> with Sing
               ),
             ),
           ),
+          // Insert function signature template
+          IconButton(
+            icon: const Icon(Icons.code, size: 20),
+            tooltip: 'Insert Signature Template',
+            onPressed: () {
+              challengeProvider.insertStarterTemplate();
+            },
+          ),
           // Font size toggle
           IconButton(
             icon: const Icon(Icons.text_fields, size: 20),
+            tooltip: 'Font Size',
             onPressed: () {
               setState(() {
                 _fontSize = _fontSize == 13.0 ? 15.0 : (_fontSize == 15.0 ? 12.0 : 13.0);
               });
             },
           ),
-          const SizedBox(width: 8),
+          // Clear editor
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 20),
+            tooltip: 'Clear Editor',
+            onPressed: () {
+              challengeProvider.onCodeChanged('');
+            },
+          ),
+          const SizedBox(width: 4),
         ],
         bottom: TabBar(
           controller: _tabController,

@@ -55,7 +55,7 @@ class ChallengeProvider extends ChangeNotifier {
   /// Ratio of manual typing (0.0 to 1.0)
   double get manualTypingRatio {
     if (_currentCode.trim().isEmpty) return 1.0;
-    if (_pasteAttemptsCount > 0) return 0.5; // Penalized if paste attempted
+    if (_pasteAttemptsCount > 0) return 0.0; // Strictly penalized if paste attempted
     final ratio = _manualCharactersEntered / _currentCode.length;
     return ratio.clamp(0.0, 1.0);
   }
@@ -63,8 +63,8 @@ class ChallengeProvider extends ChangeNotifier {
   /// Typing progress towards solution structure
   double get typingProgress {
     if (_currentQuestion == null) return 0.0;
-    final targetLen = (_currentQuestion!.starterCode[_selectedLanguage]?.length ?? 100) + 80;
-    return (_currentCode.length / targetLen).clamp(0.0, 1.0);
+    // Goal of ~50 characters of manually typed code to complete progress bar
+    return (_manualCharactersEntered / 50.0).clamp(0.0, 1.0);
   }
 
   /// Loads or assigns the next unique challenge for a specific app's unlock session
@@ -105,10 +105,11 @@ class ChallengeProvider extends ChangeNotifier {
   }
 
   void _resetEditorState() {
-    _currentCode = _currentQuestion?.starterCode[_selectedLanguage] ?? '';
+    // Editor starts completely empty so the user must type the solution manually
+    _currentCode = '';
     _keystrokesCount = 0;
     _pasteAttemptsCount = 0;
-    _manualCharactersEntered = _currentCode.length;
+    _manualCharactersEntered = 0;
     _firstEditTime = null;
     _lastResult = null;
     _recentlyEarnedReward = null;
@@ -118,8 +119,20 @@ class ChallengeProvider extends ChangeNotifier {
   void setLanguage(String language) {
     if (AppConstants.supportedLanguages.contains(language)) {
       _selectedLanguage = language;
-      _currentCode = _currentQuestion?.starterCode[language] ?? '';
+      _currentCode = ''; // Keeps editor clean and empty on language change
+      _manualCharactersEntered = 0;
+      _keystrokesCount = 0;
       _lastResult = null;
+      notifyListeners();
+    }
+  }
+
+  /// Inserts only the blank function signature/template if user requests it
+  void insertStarterTemplate() {
+    final template = _currentQuestion?.starterCode[_selectedLanguage] ?? '';
+    if (template.isNotEmpty) {
+      _currentCode = template;
+      _manualCharactersEntered = template.length;
       notifyListeners();
     }
   }
