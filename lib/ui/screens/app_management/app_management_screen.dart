@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/time_utils.dart';
+import '../../../data/platform/app_usage_bridge.dart';
 import '../../../providers/usage_tracking_provider.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/glassmorphic_card.dart';
@@ -94,6 +95,55 @@ class _AppManagementScreenState extends State<AppManagementScreen> {
           ),
           const SizedBox(height: 6),
 
+          // Permission Alert Banner if missing
+          if (!usageProvider.arePermissionsGranted)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: GlassmorphicCard(
+                padding: const EdgeInsets.all(12),
+                border: Border.all(color: Colors.amber.withAlpha(160)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Permissions Required to Count Screen Time',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Usage Access & Accessibility are needed to count screen time when an app opens and lock it after the limit.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary.withAlpha(220),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                      onPressed: () => _showPermissionsDialog(context, usageProvider),
+                      child: const Text('Grant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Info banner
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -142,8 +192,11 @@ class _AppManagementScreenState extends State<AppManagementScreen> {
                         usedSeconds: used,
                         activeReward: reward,
                         isRestricted: isRestricted,
-                        onToggleProtection: (val) {
-                          usageProvider.toggleProtection(app.packageName, val);
+                        onToggleProtection: (val) async {
+                          await usageProvider.toggleProtection(app.packageName, val);
+                          if (val && !usageProvider.arePermissionsGranted && context.mounted) {
+                            _showPermissionsDialog(context, usageProvider);
+                          }
                         },
                         onEditLimit: () {
                           showDialog(
@@ -261,6 +314,69 @@ class _AppManagementScreenState extends State<AppManagementScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _showPermissionsDialog(BuildContext context, UsageTrackingProvider usageProvider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(
+          children: [
+            Icon(Icons.security, color: AppColors.secondary),
+            SizedBox(width: 10),
+            Text('Permissions Required'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'To count your screen time as soon as you open an app and lock it once your daily limit is exhausted, two permissions are needed:',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.data_usage, color: AppColors.primaryLight),
+              title: const Text('1. Usage Access Permission', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Measures foreground screen-time accurately.', style: TextStyle(fontSize: 12)),
+              trailing: ElevatedButton(
+                onPressed: () async {
+                  await AppUsageBridge.requestUsagePermission();
+                  if (context.mounted) usageProvider.checkPermissions();
+                },
+                child: const Text('Open'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.accessibility_new, color: AppColors.secondary),
+              title: const Text('2. Accessibility Service', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Locks the app and presents the coding unlock screen.', style: TextStyle(fontSize: 12)),
+              trailing: ElevatedButton(
+                onPressed: () async {
+                  await AppUsageBridge.requestAccessibilityPermission();
+                  if (context.mounted) usageProvider.checkPermissions();
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              usageProvider.checkPermissions();
+            },
+            child: const Text('Done', style: TextStyle(color: AppColors.secondary)),
+          ),
+        ],
+      ),
     );
   }
 

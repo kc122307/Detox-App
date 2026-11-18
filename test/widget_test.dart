@@ -11,9 +11,9 @@ import 'package:code_to_unlock/data/repositories/question_repository.dart';
 
 void main() {
   group('Code to Unlock: Core Rules & Logic Tests', () {
-    test('Reward rules must enforce 20 minutes and exponential doubling for unlocks', () {
-      expect(AppConstants.rewardDurationMinutes, 20);
-      expect(AppConstants.rewardDurationSeconds, 1200);
+    test('Reward rules must enforce 15 minutes and exponential doubling for unlocks', () {
+      expect(AppConstants.rewardDurationMinutes, 15);
+      expect(AppConstants.rewardDurationSeconds, 900);
       // Doubling rule across the day: 1st unlock = 1, 2nd = 2, 3rd = 4, 4th = 8...
       expect(AppConstants.getRequiredQuestionsForUnlock(0), 1);
       expect(AppConstants.getRequiredQuestionsForUnlock(1), 2);
@@ -165,7 +165,7 @@ void main() {
 
       service.notifyRewardUnlocked('Instagram');
       expect(service.recentNotifications.length, 2);
-      expect(service.recentNotifications.first.title, contains('20 Minutes Unlocked'));
+      expect(service.recentNotifications.first.title, contains('15 Minutes Unlocked'));
     });
 
     test('App Usage Repository: Exports data and records rollover cleanly', () async {

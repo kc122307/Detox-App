@@ -239,7 +239,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 _buildPhilosophyPill(
                   Icons.lock_clock,
                   'Earn Screen Time',
-                  'When an app limit is exhausted, solve coding interview problems to unlock 20 minutes.',
+                  'When an app limit is exhausted, solve coding interview problems to unlock 15 minutes.',
                 ),
                 const SizedBox(height: 12),
                 _buildPhilosophyPill(
@@ -787,12 +787,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Fixed 20-Minute Rewards',
+                              'Fixed 15-Minute Rewards',
                               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'A successful unlock grants exactly 20 minutes to that specific app. When expired, the app locks again.',
+                              'A successful unlock grants exactly 15 minutes to that specific app. When expired, the app locks again.',
                               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
                           ],

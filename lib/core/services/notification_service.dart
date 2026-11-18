@@ -88,15 +88,15 @@ class NotificationService extends ChangeNotifier {
   void notifyLimitExhausted(String appName) {
     dispatchNotification(
       title: '$appName Limit Reached',
-      body: 'Your daily screen-time allowance is exhausted. Solve a coding challenge to earn 20 minutes.',
+      body: 'Your daily screen-time allowance is exhausted. Solve a coding challenge to earn 15 minutes.',
       type: NotificationType.limitExhausted,
     );
   }
 
   void notifyRewardUnlocked(String appName) {
     dispatchNotification(
-      title: '20 Minutes Unlocked! 🎉',
-      body: 'Challenge accepted! You have earned 20 minutes of usage for $appName.',
+      title: '15 Minutes Unlocked! 🎉',
+      body: 'Challenge accepted! You have earned 15 minutes of usage for $appName.',
       type: NotificationType.rewardUnlocked,
     );
   }
@@ -104,7 +104,7 @@ class NotificationService extends ChangeNotifier {
   void notifyRewardExpiring(String appName) {
     dispatchNotification(
       title: '$appName: Reward Expiring Soon',
-      body: 'Your earned 20-minute session will expire in 2 minutes.',
+      body: 'Your earned 15-minute session will expire in 2 minutes.',
       type: NotificationType.rewardExpiring,
     );
   }

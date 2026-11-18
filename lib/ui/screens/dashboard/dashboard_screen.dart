@@ -23,11 +23,12 @@ class DashboardScreen extends StatelessWidget {
     final usageProvider = context.watch<UsageTrackingProvider>();
     final progressionProvider = context.watch<ProgressionProvider>();
 
-    // If an app is currently restricted, allow direct overlay jump
+    // If an app is currently restricted, transition to restriction overlay
     if (usageProvider.currentlyRestrictedAppPackage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final pkg = usageProvider.currentlyRestrictedAppPackage;
         if (pkg != null) {
+          usageProvider.clearCurrentlyRestrictedApp();
           Navigator.push(
             context,
             MaterialPageRoute(

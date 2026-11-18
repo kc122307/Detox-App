@@ -70,7 +70,7 @@ class _CodingChallengeScreenState extends State<CodingChallengeScreen> with Sing
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
             Text(
-              'Step $currentStep of $totalRequired • 20m Reward',
+              'Step $currentStep of $totalRequired • 15m Reward',
               style: const TextStyle(fontSize: 11, color: AppColors.secondary),
             ),
           ],
@@ -394,7 +394,7 @@ class _CodingChallengeScreenState extends State<CodingChallengeScreen> with Sing
             ],
           ),
           content: Text(
-            'Solved $solved of $total required challenges for this unlock. Solve $remaining more problem${remaining > 1 ? "s" : ""} to earn your 20 minutes.',
+            'Solved $solved of $total required challenges for this unlock. Solve $remaining more problem${remaining > 1 ? "s" : ""} to earn your 15 minutes.',
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           actions: [
@@ -409,13 +409,13 @@ class _CodingChallengeScreenState extends State<CodingChallengeScreen> with Sing
         ),
       );
     } else if (challengeProvider.recentlyEarnedReward != null) {
-      // 20 minutes unlocked!
+      // 15 minutes unlocked!
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           backgroundColor: AppColors.surface,
-          title: const Text('🎉 20 Minutes Earned!'),
+          title: const Text('🎉 15 Minutes Earned!'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -430,7 +430,7 @@ class _CodingChallengeScreenState extends State<CodingChallengeScreen> with Sing
               ),
               const SizedBox(height: 16),
               Text(
-                'You have successfully unlocked 20 additional minutes for ${widget.targetAppName}!',
+                'You have successfully unlocked 15 additional minutes for ${widget.targetAppName}!',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textPrimary, height: 1.4),
               ),

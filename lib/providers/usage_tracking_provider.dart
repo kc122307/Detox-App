@@ -13,6 +13,7 @@ class UsageTrackingProvider extends ChangeNotifier {
   final AppUsageRepository _repository;
   final NotificationService? notificationService;
   Timer? _tickerTimer;
+  int _tickCounter = 0;
 
   List<ManagedAppModel> _managedApps = [];
   Map<String, int> _todayUsage = {};
@@ -22,8 +23,15 @@ class UsageTrackingProvider extends ChangeNotifier {
   String? _currentlyRestrictedAppPackage;
   String _currentDateKey = TimeUtils.getTodayDateKey();
   bool _isSyncingApps = false;
+  bool _hasUsagePermission = false;
+  bool _hasAccessibilityPermission = false;
 
   UsageTrackingProvider(this._repository, {this.notificationService}) {
+    AppUsageBridge.setRestrictionListener((pkg) {
+      triggerAppRestriction(pkg);
+    });
+    _initPendingRestriction();
+    checkPermissions();
     _loadState();
     syncInstalledApplications();
     _startUsageTicker();
@@ -35,6 +43,22 @@ class UsageTrackingProvider extends ChangeNotifier {
   Map<String, bool> get restrictedStatus => _restrictedStatus;
   String? get currentlyRestrictedAppPackage => _currentlyRestrictedAppPackage;
   bool get isSyncingApps => _isSyncingApps;
+  bool get hasUsagePermission => _hasUsagePermission;
+  bool get hasAccessibilityPermission => _hasAccessibilityPermission;
+  bool get arePermissionsGranted => _hasUsagePermission && _hasAccessibilityPermission;
+
+  Future<void> checkPermissions() async {
+    _hasUsagePermission = await AppUsageBridge.hasUsagePermission();
+    _hasAccessibilityPermission = await AppUsageBridge.hasAccessibilityPermission();
+    notifyListeners();
+  }
+
+  Future<void> _initPendingRestriction() async {
+    final pending = await AppUsageBridge.getPendingRestrictedPackage();
+    if (pending != null && pending.isNotEmpty) {
+      triggerAppRestriction(pending);
+    }
+  }
 
   /// Scans all launchable applications installed on the phone and merges them into detox manager
   Future<void> syncInstalledApplications() async {
@@ -67,6 +91,7 @@ class UsageTrackingProvider extends ChangeNotifier {
   void _loadState() {
     _managedApps = _repository.getManagedApps();
     _refreshUsageData();
+    _syncRealDeviceUsage();
   }
 
   void _refreshUsageData() {
@@ -89,7 +114,7 @@ class UsageTrackingProvider extends ChangeNotifier {
     _activeRewards = newRewards;
     _restrictedStatus = newRestricted;
 
-    // Sync active state to platform channel bridge
+    // Sync active state and limits to platform channel bridge
     final restrictedList = _managedApps
         .where((a) => _restrictedStatus[a.packageName] == true)
         .map((a) => a.packageName)
@@ -101,17 +126,59 @@ class UsageTrackingProvider extends ChangeNotifier {
       }
     });
 
+    final protectedLimits = <String, int>{};
+    for (final app in _managedApps.where((a) => a.protectionEnabled)) {
+      protectedLimits[app.packageName] = app.dailyLimitSeconds;
+    }
+
     AppUsageBridge.updateActiveRestrictions(
       restrictedPackages: restrictedList,
       activeRewardSeconds: rewardsMap,
+      protectedLimits: protectedLimits,
     );
 
     notifyListeners();
   }
 
+  Future<void> _syncRealDeviceUsage() async {
+    final realStats = await AppUsageBridge.getRealUsageStats();
+    if (realStats.isEmpty) return;
+
+    bool updated = false;
+    for (final app in _managedApps) {
+      if (!app.protectionEnabled) continue;
+
+      final realSeconds = realStats[app.packageName];
+      if (realSeconds != null && realSeconds > (_todayUsage[app.packageName] ?? 0)) {
+        await _repository.setTodayUsageSeconds(app.packageName, realSeconds);
+        _todayUsage[app.packageName] = realSeconds;
+        updated = true;
+
+        final isExceeded = realSeconds >= app.dailyLimitSeconds;
+        final reward = _activeRewards[app.packageName];
+        final isRewardActive = reward != null && !reward.isExpired;
+
+        if (isExceeded && !isRewardActive) {
+          if (_restrictedStatus[app.packageName] != true) {
+            _restrictedStatus[app.packageName] = true;
+            _currentlyRestrictedAppPackage = app.packageName;
+            notificationService?.notifyLimitExhausted(app.appName);
+            updated = true;
+          }
+        }
+      }
+    }
+
+    if (updated) {
+      _refreshUsageData();
+    }
+  }
+
   void _startUsageTicker() {
     _tickerTimer?.cancel();
     _tickerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _tickCounter++;
+
       // Check for midnight rollover
       final nowKey = TimeUtils.getTodayDateKey();
       if (nowKey != _currentDateKey) {
@@ -119,6 +186,11 @@ class UsageTrackingProvider extends ChangeNotifier {
         _repository.recordDateActive(nowKey);
         _refreshUsageData();
         return;
+      }
+
+      // Check real device screen-time periodically every 2 seconds
+      if (_tickCounter % 2 == 0) {
+        _syncRealDeviceUsage();
       }
 
       // Check countdowns for active rewards
@@ -197,7 +269,7 @@ class UsageTrackingProvider extends ChangeNotifier {
     return _repository.getOrCreateUnlockSession(packageName);
   }
 
-  /// Grants 20-minute reward when required coding challenge(s) are passed
+  /// Grants 15-minute reward when required coding challenge(s) are passed
   Future<RewardTransactionModel> grantRewardForSession({
     required String packageName,
     required String unlockSessionId,

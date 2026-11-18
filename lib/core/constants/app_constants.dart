@@ -4,8 +4,8 @@ class AppConstants {
   static const String appPhilosophy = 'Use less social media. Solve more coding problems. Improve your programming skills. Earn your screen time.';
 
   // Reward Rules
-  static const int rewardDurationMinutes = 20;
-  static const int rewardDurationSeconds = rewardDurationMinutes * 60; // 1200s
+  static const int rewardDurationMinutes = 15;
+  static const int rewardDurationSeconds = rewardDurationMinutes * 60; // 900s
   static const int firstUnlockRequiredQuestions = 1;
   static const int subsequentUnlockRequiredQuestions = 2;
 

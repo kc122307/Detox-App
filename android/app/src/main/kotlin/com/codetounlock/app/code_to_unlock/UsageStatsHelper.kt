@@ -18,31 +18,42 @@ class UsageStatsHelper(private val context: Context) {
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
-    fun getUsageSecondsToday(packageName: String): Long {
-        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-            ?: return 0L
-
-        val calendar = Calendar.getInstance().apply {
+    private fun getStartOfDayMillis(): Long {
+        return Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
-        }
-        val startTime = calendar.timeInMillis
+        }.timeInMillis
+    }
+
+    fun getUsageSecondsToday(packageName: String): Long {
+        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+            ?: return 0L
+
+        val startTime = getStartOfDayMillis()
         val endTime = System.currentTimeMillis()
 
-        val stats = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
-            startTime,
-            endTime
-        ) ?: return 0L
+        val aggregated = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
+        val usage = aggregated[packageName] ?: return 0L
+        return usage.totalTimeInForeground / 1000L
+    }
 
-        for (usage in stats) {
-            if (usage.packageName == packageName) {
-                return usage.totalTimeInForeground / 1000L
+    fun getAllUsageSecondsToday(): Map<String, Long> {
+        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+            ?: return emptyMap()
+
+        val startTime = getStartOfDayMillis()
+        val endTime = System.currentTimeMillis()
+
+        val aggregated = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
+        val result = HashMap<String, Long>()
+        for ((pkg, stats) in aggregated) {
+            val seconds = stats.totalTimeInForeground / 1000L
+            if (seconds > 0) {
+                result[pkg] = seconds
             }
         }
-        return 0L
+        return result
     }
 }
-

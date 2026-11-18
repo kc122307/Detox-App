@@ -63,7 +63,7 @@ class RestrictionOverlayScreen extends StatelessWidget {
 
               // Title
               Text(
-                'You have reached your\n${app.appName} limit',
+                '${app.appName} Limit Reached',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 26,
@@ -72,17 +72,26 @@ class RestrictionOverlayScreen extends StatelessWidget {
                   height: 1.2,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Your next 20 minutes must be earned.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.secondary,
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.secondary.withAlpha(80)),
+                ),
+                child: Text(
+                  'If you want to use ${app.appName} for 15 minutes, you have to solve $requiredQuestions coding ${requiredQuestions == 1 ? "question" : "questions"}.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.secondary,
+                    height: 1.3,
+                  ),
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Stats summary card
               GlassmorphicCard(
@@ -114,7 +123,18 @@ class RestrictionOverlayScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Required Coding Challenges:', style: TextStyle(color: AppColors.textSecondary)),
+                        const Text('Unlock Reward Duration:', style: TextStyle(color: AppColors.textSecondary)),
+                        const Text(
+                          '15 Minutes',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondary),
+                        ),
+                      ],
+                    ),
+                    const Divider(color: AppColors.surfaceBorder, height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Required Challenges:', style: TextStyle(color: AppColors.textSecondary)),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
@@ -133,7 +153,7 @@ class RestrictionOverlayScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Daily Unlock #${session.unlockSequence} • Doubling rule (1 → 2 → 4 → 8...)',
+                      'Daily Unlock #${session.unlockSequence} • Doubling rule: 1st=1, 2nd=2, 3rd=4, 4th=8 questions',
                       style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
                     ),
                   ],
@@ -165,7 +185,7 @@ class RestrictionOverlayScreen extends StatelessWidget {
 
               // CTA to Solve Coding Challenge
               CustomGradientButton(
-                text: 'Solve Challenge (Unlock 20m)',
+                text: 'Solve $requiredQuestions ${requiredQuestions == 1 ? "Challenge" : "Challenges"} (Unlock 15m)',
                 icon: Icons.code,
                 onPressed: () {
                   final challengeProvider = context.read<ChallengeProvider>();

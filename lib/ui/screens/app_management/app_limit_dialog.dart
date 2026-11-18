@@ -60,7 +60,7 @@ class _AppLimitDialogState extends State<AppLimitDialog> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Once this allowance is exhausted, solving coding challenges will be required to unlock 20-minute sessions.',
+              'Once this allowance is exhausted, solving coding challenges will be required to unlock 15-minute sessions.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 24),

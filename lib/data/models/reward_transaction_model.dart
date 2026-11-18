@@ -4,7 +4,7 @@ class RewardTransactionModel {
   final String packageName;
   final String unlockSessionId;
   final List<String> challengeIds;
-  final int durationSeconds; // 1200 for 20 mins
+  final int durationSeconds; // 900 for 15 mins
   final DateTime grantedAt;
   final DateTime expiresAt;
   final String status; // 'active', 'expired', 'revoked'
@@ -15,7 +15,7 @@ class RewardTransactionModel {
     required this.packageName,
     required this.unlockSessionId,
     required this.challengeIds,
-    this.durationSeconds = 1200,
+    this.durationSeconds = 900,
     required this.grantedAt,
     required this.expiresAt,
     this.status = 'active',
@@ -52,7 +52,7 @@ class RewardTransactionModel {
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      durationSeconds: (json['duration_seconds'] as num?)?.toInt() ?? 1200,
+      durationSeconds: (json['duration_seconds'] as num?)?.toInt() ?? 900,
       grantedAt: DateTime.parse(json['granted_at'] as String),
       expiresAt: DateTime.parse(json['expires_at'] as String),
       status: json['status'] as String? ?? 'active',
