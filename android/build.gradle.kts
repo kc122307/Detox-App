@@ -1,7 +1,22 @@
 allprojects {
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+        }
+        configurations.all {
+            resolutionStrategy {
+                force("com.android.tools.build:gradle:9.0.1")
+                force("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.20")
+            }
+        }
+    }
     repositories {
         google()
         mavenCentral()
+        maven {
+            url = uri("https://storage.googleapis.com/download.flutter.io")
+        }
     }
 }
 
