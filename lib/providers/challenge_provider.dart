@@ -29,6 +29,8 @@ class ChallengeProvider extends ChangeNotifier {
   SubmissionResult? _lastResult;
   RewardTransactionModel? _recentlyEarnedReward;
   bool _requiresSecondQuestion = false;
+  int _solvedQuestionsInSession = 0;
+  int _totalRequiredInSession = 1;
 
   ChallengeProvider(
     this._questionRepo,
@@ -46,6 +48,9 @@ class ChallengeProvider extends ChangeNotifier {
   SubmissionResult? get lastResult => _lastResult;
   RewardTransactionModel? get recentlyEarnedReward => _recentlyEarnedReward;
   bool get requiresSecondQuestion => _requiresSecondQuestion;
+  bool get requiresMoreQuestions => _requiresSecondQuestion;
+  int get solvedQuestionsInSession => _solvedQuestionsInSession;
+  int get totalRequiredInSession => _totalRequiredInSession;
 
   /// Ratio of manual typing (0.0 to 1.0)
   double get manualTypingRatio {
@@ -200,9 +205,11 @@ class ChallengeProvider extends ChangeNotifier {
       // 2. Update unlock session
       final session = _usageProvider.getActiveUnlockSession(targetPackageName);
       final updatedSolved = [...session.solvedQuestionIds, _currentQuestion!.id];
+      _totalRequiredInSession = session.requiredQuestionCount;
+      _solvedQuestionsInSession = updatedSolved.length;
 
       if (updatedSolved.length >= session.requiredQuestionCount) {
-        // Both questions (or single question for 1st unlock) completed!
+        // All required questions for this unlock completed!
         final reward = await _usageProvider.grantRewardForSession(
           packageName: targetPackageName,
           unlockSessionId: session.id,
@@ -211,9 +218,8 @@ class ChallengeProvider extends ChangeNotifier {
         _recentlyEarnedReward = reward;
         _requiresSecondQuestion = false;
       } else {
-        // Need second question!
+        // More questions required (doubling rule: 1 -> 2 -> 4 -> 8...)
         _requiresSecondQuestion = true;
-        // Assign second question
         final nextQuestion = _questionRepo.getNextUniqueQuestion(
           userLevel: _progressionProvider.progress.currentLevel,
           assignedQuestionIds: _progressionProvider.progress.assignedQuestionIds,

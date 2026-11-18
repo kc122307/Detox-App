@@ -122,7 +122,7 @@ class RestrictionOverlayScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            requiredQuestions == 1 ? '1 Problem' : '2 Problems',
+                            '$requiredQuestions ${requiredQuestions == 1 ? "Problem" : "Problems"}',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: AppColors.primaryLight,
@@ -130,6 +130,11 @@ class RestrictionOverlayScreen extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Daily Unlock #${session.unlockSequence} • Doubling rule (1 → 2 → 4 → 8...)',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
                     ),
                   ],
                 ),

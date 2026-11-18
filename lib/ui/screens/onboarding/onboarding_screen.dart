@@ -7,6 +7,7 @@ import '../../../data/repositories/user_preferences_repository.dart';
 import '../../../providers/usage_tracking_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/glassmorphic_card.dart';
+import '../app_management/app_limit_dialog.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onFinish;
@@ -22,30 +23,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _currentPage = 0;
 
   // Form states
-  final Set<String> _selectedGoals = {
-    'Reduce social media usage',
-    'Improve DSA skills',
-    'Prepare for technical interviews',
-  };
   String _selectedLanguage = 'Python';
-  int _dailyCodingGoal = 2; // problems
-  int _dailyScreenTimeGoal = 90; // minutes
-  final Set<String> _selectedAppPackages = {
-    'com.google.android.youtube',
-    'com.instagram.android',
-    'com.reddit.frontpage',
-  };
+  final Map<String, int> _appLimits = {};
+  final Set<String> _enabledAppPackages = {};
 
-  final List<String> _availableGoals = [
-    'Reduce social media usage',
-    'Improve DSA skills',
-    'Prepare for technical interviews',
-    'Build daily coding consistency',
-    'Improve productivity & focus',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Default sensible per-app limits for target applications
+    _appLimits['com.google.android.youtube'] = 60; // 1 hour
+    _appLimits['com.instagram.android'] = 45; // 45 minutes
+    _appLimits['com.reddit.frontpage'] = 30; // 30 minutes
+    _appLimits['com.facebook.katana'] = 30;
+    _appLimits['com.snapchat.android'] = 30;
+    _appLimits['com.twitter.android'] = 30;
+    _appLimits['com.whatsapp'] = 120; // 2 hours
+
+    // By default, social media apps have detox enabled; others can be toggled
+    _enabledAppPackages.addAll([
+      'com.google.android.youtube',
+      'com.instagram.android',
+      'com.reddit.frontpage',
+      'com.facebook.katana',
+      'com.snapchat.android',
+      'com.twitter.android',
+    ]);
+  }
 
   void _nextPage() {
-    if (_currentPage < 5) {
+    if (_currentPage < 4) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -60,17 +66,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final usageProvider = context.read<UsageTrackingProvider>();
 
     await prefsRepo.setPreferredLanguage(_selectedLanguage);
-    await prefsRepo.setSelectedGoals(_selectedGoals.toList());
-    await prefsRepo.setDailyCodingGoal(_dailyCodingGoal);
     await prefsRepo.setOnboardingComplete(true);
 
-    // Update app protection states
+    // Save individual per-app configuration
     for (final app in usageProvider.managedApps) {
-      final isSelected = _selectedAppPackages.contains(app.packageName);
-      await usageProvider.toggleProtection(app.packageName, isSelected);
+      final isProtected = _enabledAppPackages.contains(app.packageName);
+      await usageProvider.toggleProtection(app.packageName, isProtected);
+
+      final customLimit = _appLimits[app.packageName];
+      if (customLimit != null) {
+        await usageProvider.updateAppLimit(app.packageName, customLimit);
+      }
     }
 
     widget.onFinish();
+  }
+
+  String _formatLimitText(int minutes) {
+    if (minutes >= 60) {
+      final hours = minutes ~/ 60;
+      final remainingMins = minutes % 60;
+      if (remainingMins == 0) {
+        return '$hours hr${hours > 1 ? "s" : ""}';
+      }
+      return '$hours hr $remainingMins min';
+    }
+    return '$minutes min';
   }
 
   @override
@@ -80,11 +101,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Progress bar
+            // Top Progress Indicator
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Row(
-                children: List.generate(6, (index) {
+                children: List.generate(5, (index) {
                   return Expanded(
                     child: Container(
                       height: 4,
@@ -109,11 +130,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onPageChanged: (page) => setState(() => _currentPage = page),
                 children: [
                   _buildWelcomePage(),
-                  _buildGoalsPage(),
                   _buildLanguagePage(),
-                  _buildDailyTargetsPage(),
                   _buildPermissionsPage(),
-                  _buildAppSelectionPage(),
+                  _buildAppConfigPage(),
+                  _buildHowUnlocksWorkPage(),
                 ],
               ),
             ),
@@ -131,13 +151,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           curve: Curves.easeInOut,
                         );
                       },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.surfaceBorder),
+                        foregroundColor: AppColors.textSecondary,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      ),
                       child: const Text('Back'),
                     ),
                     const SizedBox(width: 12),
                   ],
                   Expanded(
                     child: CustomGradientButton(
-                      text: _currentPage == 5 ? 'Get Started' : 'Continue',
+                      text: _currentPage == 4 ? 'Get Started' : 'Continue',
                       onPressed: _nextPage,
                     ),
                   ),
@@ -150,7 +175,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  // --- Screen 1: Welcome ---
+  // --- Screen 1: Welcome & Philosophy ---
   Widget _buildWelcomePage() {
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -158,22 +183,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 90,
-            height: 90,
+            width: 88,
+            height: 88,
             decoration: BoxDecoration(
               gradient: AppColors.primaryGradient,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primary.withAlpha(90),
-                  blurRadius: 20,
+                  blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
             child: const Icon(Icons.code, size: 48, color: Colors.white),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
           Text(
             AppConstants.appName,
             style: const TextStyle(
@@ -183,96 +208,52 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             AppConstants.appTagline,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppColors.secondary,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           GlassmorphicCard(
             padding: const EdgeInsets.all(20),
-            child: Text(
-              AppConstants.appPhilosophy,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 15,
-                color: AppColors.textSecondary,
-                height: 1.6,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Screen 2: Choose Goals ---
-  Widget _buildGoalsPage() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'What are your goals?',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Personalize your digital detox and coding journey.',
-            style: TextStyle(fontSize: 14, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _availableGoals.length,
-              itemBuilder: (context, index) {
-                final goal = _availableGoals[index];
-                final isSelected = _selectedGoals.contains(goal);
-                return GlassmorphicCard(
-                  onTap: () {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedGoals.remove(goal);
-                      } else {
-                        _selectedGoals.add(goal);
-                      }
-                    });
-                  },
-                  margin: const EdgeInsets.only(bottom: 12),
-                  border: isSelected
-                      ? Border.all(color: AppColors.primary, width: 1.5)
-                      : null,
-                  child: Row(
-                    children: [
-                      Icon(
-                        isSelected ? Icons.check_circle : Icons.circle_outlined,
-                        color: isSelected ? AppColors.primary : AppColors.textMuted,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(
-                          goal,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                            color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
+            child: Column(
+              children: [
+                Text(
+                  AppConstants.appPhilosophy,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                    height: 1.5,
                   ),
-                );
-              },
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: AppColors.surfaceBorder, height: 1),
+                const SizedBox(height: 16),
+                _buildPhilosophyPill(
+                  Icons.tune,
+                  'Individual App Limits',
+                  'Set 1h for Instagram, 2h for YouTube, or turn off detox for apps you choose.',
+                ),
+                const SizedBox(height: 12),
+                _buildPhilosophyPill(
+                  Icons.lock_clock,
+                  'Earn Screen Time',
+                  'When an app limit is exhausted, solve coding interview problems to unlock 20 minutes.',
+                ),
+                const SizedBox(height: 12),
+                _buildPhilosophyPill(
+                  Icons.trending_up,
+                  'Daily Escalation',
+                  'Unlocks double in challenge count each time (1 → 2 → 4 → 8...).',
+                ),
+              ],
             ),
           ),
         ],
@@ -280,7 +261,44 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  // --- Screen 3: Preferred Language ---
+  Widget _buildPhilosophyPill(IconData icon, String title, String subtitle) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withAlpha(30),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: AppColors.primaryLight),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- Screen 2: Language Selection ---
   Widget _buildLanguagePage() {
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -297,7 +315,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Choose your primary language for solving challenges. You can change this at any time.',
+            'Choose your primary programming language for solving coding interview challenges.',
             style: TextStyle(fontSize: 14, color: AppColors.textMuted),
           ),
           const SizedBox(height: 24),
@@ -312,8 +330,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColors.secondary.withAlpha(40)
@@ -322,10 +340,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        lang == 'JavaScript' ? 'JS' : (lang == 'Python' ? 'PY' : (lang == 'Java' ? 'JV' : 'C++')),
+                        lang == 'JavaScript'
+                            ? 'JS'
+                            : (lang == 'Python'
+                                ? 'PY'
+                                : (lang == 'Java' ? 'JV' : 'C++')),
                         style: TextStyle(
                           color: isSelected ? AppColors.secondary : AppColors.textMuted,
                           fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                     ),
@@ -341,7 +364,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   const Spacer(),
                   if (isSelected)
-                    const Icon(Icons.check, color: AppColors.secondary),
+                    const Icon(Icons.check_circle, color: AppColors.secondary),
                 ],
               ),
             );
@@ -351,98 +374,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  // --- Screen 4: Daily Goals ---
-  Widget _buildDailyTargetsPage() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Set Daily Targets',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Form healthy screen-time habits and steady coding discipline.',
-            style: TextStyle(fontSize: 14, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 32),
-          GlassmorphicCard(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Daily Coding Target',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      '$_dailyCodingGoal Problems / Day',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                Slider(
-                  value: _dailyCodingGoal.toDouble(),
-                  min: 1,
-                  max: 5,
-                  divisions: 4,
-                  onChanged: (val) => setState(() => _dailyCodingGoal = val.round()),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          GlassmorphicCard(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Target Screen Time',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      '$_dailyScreenTimeGoal Minutes',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.secondary,
-                      ),
-                    ),
-                  ],
-                ),
-                Slider(
-                  value: _dailyScreenTimeGoal.toDouble(),
-                  min: 30,
-                  max: 240,
-                  divisions: 7,
-                  onChanged: (val) => setState(() => _dailyScreenTimeGoal = val.round()),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Screen 5: Grant Permissions ---
+  // --- Screen 3: Permissions ---
   Widget _buildPermissionsPage() {
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -459,24 +391,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'We strictly protect your privacy. Required permissions are used locally to enforce your chosen app limits.',
+            'These permissions run 100% locally on your device to track your foreground app usage and enforce your custom limits.',
             style: TextStyle(fontSize: 14, color: AppColors.textMuted),
           ),
           const SizedBox(height: 24),
           _buildPermissionItem(
             icon: Icons.data_usage,
-            title: 'Usage Access',
-            description: 'Accurately measures active screen time for selected applications.',
+            title: 'Usage Access Permission',
+            description: 'Accurately tracks active screen time per application locally.',
             onTap: AppUsageBridge.requestUsagePermission,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _buildPermissionItem(
             icon: Icons.accessibility_new,
             title: 'Accessibility Service',
-            description: 'Enables instant detection of restricted apps to present the unlock challenge.',
+            description: 'Enforces restriction overlay when an app exhausts its allowance.',
             onTap: AppUsageBridge.requestAccessibilityPermission,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _buildPermissionItem(
             icon: Icons.notifications_active,
             title: 'Notifications',
@@ -503,7 +435,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               color: AppColors.primary.withAlpha(30),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 24),
+            child: Icon(icon, color: AppColors.primaryLight, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -526,17 +458,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ],
             ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: onTap,
-            child: const Text('Enable', style: TextStyle(color: AppColors.secondary)),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              backgroundColor: AppColors.surfaceElevated,
+              foregroundColor: AppColors.secondary,
+            ),
+            child: const Text('Enable', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  // --- Screen 6: Application Selection ---
-  Widget _buildAppSelectionPage() {
+  // --- Screen 4: Individual App Limits (Star Screen) ---
+  Widget _buildAppConfigPage() {
     final apps = context.watch<UsageTrackingProvider>().managedApps;
 
     return Padding(
@@ -545,7 +482,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Select Target Apps',
+            'Configure Individual Apps',
             style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.bold,
@@ -554,59 +491,340 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Choose the applications you want to manage with programming challenges.',
-            style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+            'Detox is 100% individual. Set different limits for different apps (e.g. 1 hour, 2 hours), or turn detox OFF for apps you do not want restricted.',
+            style: TextStyle(fontSize: 13, color: AppColors.textMuted),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Expanded(
             child: ListView.builder(
               itemCount: apps.length,
               itemBuilder: (context, index) {
                 final app = apps[index];
-                final isSelected = _selectedAppPackages.contains(app.packageName);
+                final isEnabled = _enabledAppPackages.contains(app.packageName);
+                final currentLimit = _appLimits[app.packageName] ?? app.dailyLimitMinutes;
 
                 return GlassmorphicCard(
-                  onTap: () {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedAppPackages.remove(app.packageName);
-                      } else {
-                        _selectedAppPackages.add(app.packageName);
-                      }
-                    });
-                  },
-                  margin: const EdgeInsets.only(bottom: 10),
-                  border: isSelected
-                      ? Border.all(color: AppColors.primary, width: 1.5)
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  border: isEnabled
+                      ? Border.all(color: AppColors.primary.withAlpha(120), width: 1.2)
                       : null,
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        isSelected ? Icons.check_box : Icons.check_box_outline_blank,
-                        color: isSelected ? AppColors.primary : AppColors.textMuted,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          app.appName,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                      // Header Row: App Name + Switch
+                      Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: isEnabled
+                                  ? AppColors.primary.withAlpha(40)
+                                  : AppColors.surfaceElevated,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.apps,
+                              color: isEnabled ? AppColors.primaryLight : AppColors.textMuted,
+                              size: 20,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  app.appName,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: isEnabled
+                                        ? AppColors.textPrimary
+                                        : AppColors.textSecondary,
+                                  ),
+                                ),
+                                Text(
+                                  isEnabled
+                                      ? 'Daily limit: ${_formatLimitText(currentLimit)}'
+                                      : 'Detox OFF (Unrestricted)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isEnabled
+                                        ? AppColors.secondary
+                                        : AppColors.textMuted,
+                                    fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: isEnabled,
+                            activeThumbColor: AppColors.primary,
+                            onChanged: (val) {
+                              setState(() {
+                                if (val) {
+                                  _enabledAppPackages.add(app.packageName);
+                                } else {
+                                  _enabledAppPackages.remove(app.packageName);
+                                }
+                              });
+                            },
+                          ),
+                        ],
                       ),
-                      Text(
-                        '${app.dailyLimitMinutes} min limit',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textMuted,
+
+                      // If Detox is ON: show quick preset chips for 30m, 1h, 2h, and custom
+                      if (isEnabled) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            _buildPresetChip(app.packageName, 30, '30m', currentLimit),
+                            const SizedBox(width: 6),
+                            _buildPresetChip(app.packageName, 60, '1 hour', currentLimit),
+                            const SizedBox(width: 6),
+                            _buildPresetChip(app.packageName, 120, '2 hours', currentLimit),
+                            const SizedBox(width: 6),
+                            InkWell(
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AppLimitDialog(
+                                    appName: app.appName,
+                                    currentLimitMinutes: currentLimit,
+                                    onSave: (newMinutes) {
+                                      setState(() {
+                                        _appLimits[app.packageName] = newMinutes;
+                                      });
+                                    },
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceElevated,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.surfaceBorder),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.edit, size: 12, color: AppColors.textSecondary),
+                                    SizedBox(width: 4),
+                                    Text('Custom', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPresetChip(String packageName, int minutes, String label, int currentLimit) {
+    final isSelected = currentLimit == minutes;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _appLimits[packageName] = minutes;
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.surfaceBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Screen 5: How Unlocks Work (The Doubling Rule) ---
+  Widget _buildHowUnlocksWorkPage() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'How Unlocks Work',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'When an application exceeds its limit, access is restricted. Earn screen time by solving coding interview problems.',
+            style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: ListView(
+              children: [
+                // 20-minute reward card
+                GlassmorphicCard(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withAlpha(30),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.timer, color: AppColors.secondary, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Fixed 20-Minute Rewards',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'A successful unlock grants exactly 20 minutes to that specific app. When expired, the app locks again.',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Exponential Doubling Rule Card
+                GlassmorphicCard(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  border: Border.all(color: AppColors.primary, width: 1.5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.trending_up, color: AppColors.primaryLight, size: 22),
+                          SizedBox(width: 8),
+                          Text(
+                            'Daily Question Doubling Rule',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Every time you unlock extra time today (for the same or different apps), the required coding challenges double:',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildDoublingRow('1st Unlock Today', '1 Coding Question', AppColors.primaryLight),
+                      const SizedBox(height: 6),
+                      _buildDoublingRow('2nd Unlock Today', '2 Coding Questions (Doubled)', Colors.amber),
+                      const SizedBox(height: 6),
+                      _buildDoublingRow('3rd Unlock Today', '4 Coding Questions (Doubled)', Colors.orange),
+                      const SizedBox(height: 6),
+                      _buildDoublingRow('4th Unlock Today', '8 Coding Questions', Colors.deepOrange),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Counter resets at midnight daily.',
+                        style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Anti-Cheating & Manual Typing
+                GlassmorphicCard(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withAlpha(30),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.keyboard, color: AppColors.error, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Manual Typing Required',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'You must manually type your complete solution. Copy-pasting is flagged and will not unlock time.',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDoublingRow(String step, String questions, Color badgeColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(step, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: badgeColor.withAlpha(35),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              questions,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: badgeColor),
             ),
           ),
         ],

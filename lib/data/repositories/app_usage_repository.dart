@@ -187,18 +187,15 @@ class AppUsageRepository {
       return pending.first;
     }
 
-    // Determine sequence number today
+    // Determine sequence number today across all apps (questions double each time: 1 -> 2 -> 4 -> 8...)
     final todayKey = TimeUtils.getTodayDateKey();
-    final completedToday = sessions.where((s) =>
-        s.packageName == packageName &&
+    final totalCompletedTodayAcrossApps = sessions.where((s) =>
         s.status == 'completed' &&
         s.completedAt != null &&
         todayKey == TimeUtils.formatShortDate(s.completedAt!)).length;
 
-    final nextSequence = completedToday + 1;
-    final requiredQuestions = nextSequence == 1
-        ? AppConstants.firstUnlockRequiredQuestions
-        : AppConstants.subsequentUnlockRequiredQuestions;
+    final nextSequence = totalCompletedTodayAcrossApps + 1;
+    final requiredQuestions = AppConstants.getRequiredQuestionsForUnlock(totalCompletedTodayAcrossApps);
 
     final newSession = UnlockSessionModel(
       id: _uuid.v4(),

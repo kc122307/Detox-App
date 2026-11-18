@@ -378,25 +378,28 @@ class _CodingChallengeScreenState extends State<CodingChallengeScreen> with Sing
 
   void _handleAccepted(ChallengeProvider challengeProvider) {
     if (challengeProvider.requiresSecondQuestion) {
-      // Step 1 completed, need step 2
+      final solved = challengeProvider.solvedQuestionsInSession;
+      final total = challengeProvider.totalRequiredInSession;
+      final remaining = total - solved;
+
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: AppColors.surface,
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.check_circle, color: AppColors.success),
-              SizedBox(width: 8),
-              Text('Challenge 1 Accepted!'),
+              const Icon(Icons.check_circle, color: AppColors.success),
+              const SizedBox(width: 8),
+              Text('Problem $solved Accepted!'),
             ],
           ),
-          content: const Text(
-            'Great work! As this is a subsequent unlock today, exactly one more challenge is required to grant your 20 minutes.',
-            style: TextStyle(color: AppColors.textSecondary),
+          content: Text(
+            'Solved $solved of $total required challenges for this unlock. Solve $remaining more problem${remaining > 1 ? "s" : ""} to earn your 20 minutes.',
+            style: const TextStyle(color: AppColors.textSecondary),
           ),
           actions: [
             CustomGradientButton(
-              text: 'Proceed to Question 2',
+              text: 'Proceed to Question ${solved + 1}',
               onPressed: () {
                 Navigator.pop(ctx);
                 _tabController.animateTo(0); // Switch to problem statement

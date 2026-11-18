@@ -247,6 +247,11 @@ BEGIN
         RAISE EXCEPTION 'Unlock session not found or unauthorized';
     END IF;
 
+    -- Ensure solved challenges meet or exceed required question count for this sequence
+    IF jsonb_array_length(p_challenge_ids) < v_session.required_question_count THEN
+        RAISE EXCEPTION 'Insufficient challenges solved for this unlock level';
+    END IF;
+
     IF v_session.status = 'completed' THEN
         -- Idempotently return existing reward
         SELECT * INTO v_reward FROM public.reward_transactions

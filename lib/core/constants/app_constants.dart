@@ -9,6 +9,18 @@ class AppConstants {
   static const int firstUnlockRequiredQuestions = 1;
   static const int subsequentUnlockRequiredQuestions = 2;
 
+  /// Calculates required questions based on exponential doubling across the daily cycle:
+  /// 1st unlock today (completedUnlocksToday == 0): 1 question (2^0)
+  /// 2nd unlock today (completedUnlocksToday == 1): 2 questions (2^1)
+  /// 3rd unlock today (completedUnlocksToday == 2): 4 questions (2^2)
+  /// 4th unlock today (completedUnlocksToday == 3): 8 questions (2^3)
+  /// Doubles each subsequent unlock across all managed applications today.
+  static int getRequiredQuestionsForUnlock(int completedUnlocksToday) {
+    if (completedUnlocksToday <= 0) return 1;
+    if (completedUnlocksToday >= 6) return 64; // safety cap
+    return 1 << completedUnlocksToday;
+  }
+
   // Anti-cheating & Manual typing rules
   static const int maxPasteBurstCharacters = 15; // Pasting large chunks is blocked
   static const double minimumTypingPercentageForValidation = 0.85; // 85% of characters must be manually typed

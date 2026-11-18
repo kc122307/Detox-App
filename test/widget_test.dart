@@ -11,11 +11,15 @@ import 'package:code_to_unlock/data/repositories/question_repository.dart';
 
 void main() {
   group('Code to Unlock: Core Rules & Logic Tests', () {
-    test('Reward rules must enforce 20 minutes and 1st vs subsequent questions', () {
+    test('Reward rules must enforce 20 minutes and exponential doubling for unlocks', () {
       expect(AppConstants.rewardDurationMinutes, 20);
       expect(AppConstants.rewardDurationSeconds, 1200);
-      expect(AppConstants.firstUnlockRequiredQuestions, 1);
-      expect(AppConstants.subsequentUnlockRequiredQuestions, 2);
+      // Doubling rule across the day: 1st unlock = 1, 2nd = 2, 3rd = 4, 4th = 8...
+      expect(AppConstants.getRequiredQuestionsForUnlock(0), 1);
+      expect(AppConstants.getRequiredQuestionsForUnlock(1), 2);
+      expect(AppConstants.getRequiredQuestionsForUnlock(2), 4);
+      expect(AppConstants.getRequiredQuestionsForUnlock(3), 8);
+      expect(AppConstants.getRequiredQuestionsForUnlock(4), 16);
     });
 
     test('1,000+ Level System: Generates unique canonical problems with valid bands', () {
